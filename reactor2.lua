@@ -74,7 +74,8 @@ function upd(deltaTime)
     if type(inp[5]) == "number" then
         turbineFixed = inp[5]
     end
-    if inp[6] == 1 then
+    local reactorOff=getNumberOrDefault(inp[6],0)
+    if reactorOff == 1 then
         interiorFissionRate = 0
         targetFissionRate = 0
         interiorTurbine = 0
@@ -84,7 +85,9 @@ function upd(deltaTime)
 
     local staticFissionRate=getStaticFissionRate(interiorTurbine,50*load,heat)
     local DFissionRate=clamp(getStaticFissionRate(targetTurbine-interiorTurbine,50*Dload,heat),-(scrollbarSpeed-eps),(scrollbarSpeed-eps))
-    staticFissionRate=clamp(staticFissionRate+(2*clamp(getStaticFissionRate(0,50*Dload,heat),-(scrollbarSpeed-eps),(scrollbarSpeed-eps)))*deltaTime*(1+deltaTime),0,100) --从收到负载到输出有2帧间隔
+    if (load-lastLoad)>1 then
+        staticFissionRate=clamp(staticFissionRate+(2*clamp(getStaticFissionRate(0,50*Dload,heat),-(scrollbarSpeed-eps),(scrollbarSpeed-eps)))*deltaTime*(1+deltaTime),0,100) --从收到负载到输出有2帧间隔
+    end
     local fissionRateSign=sign(DFissionRate+interiorFissionRate-targetFissionRate)
     local signalFissionRate = staticFissionRate+DFissionRate-magicPara*(scrollbarSpeed*fissionRateSign-DFissionRate)*math.log((targetFissionRate-interiorFissionRate-fissionRateSign*scrollbarSpeed)/(DFissionRate-fissionRateSign*scrollbarSpeed))
     signalFissionRate = clamp(targetFissionRate+0.5*(1+scrollbarSpeed/clamp(math.abs(interiorFissionRate-targetFissionRate),0.2,scrollbarSpeed))*(signalFissionRate-targetFissionRate),0,100)
@@ -93,7 +96,9 @@ function upd(deltaTime)
     if reacotrMode==1  then
         local staticTurbine=100*load
         local DTurbine=clamp(100*Dload,-(scrollbarSpeed-eps),(scrollbarSpeed-eps))
-        staticTurbine=clamp(staticTurbine+DTurbine*deltaTime,0,100) --从收到负载到输出有1帧间隔
+        if (load-lastLoad)>1 then
+            staticTurbine=clamp(staticTurbine+DTurbine*deltaTime,0,100) --从收到负载到输出有1帧间隔
+        end
         local turbineSign=sign(DTurbine+interiorTurbine-targetTurbine)
         signalTurbine = staticTurbine+DTurbine-magicPara*(scrollbarSpeed*turbineSign-DTurbine)*math.log((targetTurbine-interiorTurbine-turbineSign*scrollbarSpeed)/(DTurbine-turbineSign*scrollbarSpeed))
         signalTurbine = clamp(targetTurbine+0.5*(1+scrollbarSpeed/clamp(math.abs(interiorTurbine-targetTurbine),0.2,scrollbarSpeed))*(signalTurbine-targetTurbine),0,100)
@@ -104,7 +109,7 @@ function upd(deltaTime)
     targetTurbine=targetTurbine+clamp(signalTurbine-targetTurbine,-scrollbarSpeed*deltaTime,scrollbarSpeed*deltaTime)
     interiorTurbine=interiorTurbine+(targetTurbine-interiorTurbine)*deltaTime
     lastLoad=load
-    if inp[6] == 1 then
+    if reactorOff == 1 then
         signalFissionRate = 0
         signalTurbine = 0
     end
