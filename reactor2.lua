@@ -1,8 +1,9 @@
-local reactorMaxOutput = 10000  --反应堆功率，如有升级变更可更改
+local reactorMaxOutput = 5000  --反应堆最大功率，如有升级，填入只计算潜艇升级的值(不计算天赋)
 local turbineFixed = 100.0  --温度堆模式下固定的涡轮输出，如果用不到反应堆满输出可降低此值以减少温度堆模式下燃料消耗
 local reactorOffNewRound = false --新巡回是否关反应堆
 local voltage=1.0 --电网电压
 local estimatedReactorMaxOutput = reactorMaxOutput  --估计的反应堆功率
+local MaxOutputAdjust=0 --反应堆功率预测微调
 local temperature = 100 --上一帧温度，修正用
 local lastInteriorTurbine = 0 --上一帧涡轮，修正用
 local time = 0
@@ -20,7 +21,7 @@ local targetTurbine = 0.0
 local reacotrMode = 0
 local reactorOff = false
 
---local test=0
+local test=0 --测试用
 
 local function clamp(x, min, max)
     if x < min then return min end
@@ -105,17 +106,20 @@ function upd(deltaTime)
     local highVoltageGridLoad = getNumberOrDefault(inp[3],0.5) --负载
     local highVoltageGridPower = getNumberOrDefault(inp[2],0) --功率
 
+    local powerAdjusted=highVoltageGridPower
     --对修正的修正
-    if temperature/50>(lastInteriorTurbine-turbineTolerance)/100 and temperature>1 and lastInteriorTurbine>turbineTolerance then
-        highVoltageGridPower=highVoltageGridPower*math.min(temperature*100/50,lastInteriorTurbine)/clamp(lastInteriorTurbine-turbineTolerance,0.5*lastInteriorTurbine,lastInteriorTurbine)
+    if temperature/50>(lastInteriorTurbine-turbineTolerance)/100 and temperature>1 and lastInteriorTurbine>turbineTolerance and highVoltageGridPower-highVoltageGridLoad>3 then
+        powerAdjusted=highVoltageGridPower*math.min(temperature*100/50,lastInteriorTurbine)/clamp(lastInteriorTurbine-turbineTolerance,0.5*lastInteriorTurbine,lastInteriorTurbine)
     end
-    if highVoltageGridPower>highVoltageGridLoad or temperature/50<(lastInteriorTurbine-10*turbineTolerance)/100 then
-        estimatedReactorMaxOutput=math.max(estimatedReactorMaxOutput,highVoltageGridPower*50/(temperature+0.01))
+    if powerAdjusted>highVoltageGridLoad or temperature/50<(lastInteriorTurbine-10*turbineTolerance)/100 then
+        local preEstimatedReactorMaxOutput=math.max(estimatedReactorMaxOutput,powerAdjusted*50/(temperature+0.01))
+        MaxOutputAdjust=clamp(MaxOutputAdjust-(preEstimatedReactorMaxOutput-estimatedReactorMaxOutput),0,5)
+        estimatedReactorMaxOutput=preEstimatedReactorMaxOutput
     end
     temperature = getNumberOrDefault(inp[1],0)/100 --温度
     lastInteriorTurbine=interiorTurbine
     
-    local load=clamp((getNumberOrDefault(inp[8],highVoltageGridLoad*voltage)+0.25)/reactorMaxOutput, 0, 1) --自定义负载
+    local load=clamp((getNumberOrDefault(inp[8],highVoltageGridLoad*voltage)+0.25)/(reactorMaxOutput+MaxOutputAdjust), 0, 1) --自定义负载
     local heat=getNumberOrDefault(inp[4],0) --燃料
     if interiorFissionRate < -0.5 then
         local mem={}
@@ -129,8 +133,12 @@ function upd(deltaTime)
         reacotrMode = inp[6] --反应堆模式
     end
     reactorMaxOutput=estimatedReactorMaxOutput
+    if math.abs(highVoltageGridPower-highVoltageGridLoad)<5 and math.abs(load-lastLoad)*reactorMaxOutput<2.5 then
+        MaxOutputAdjust=clamp(MaxOutputAdjust+sigmoid(1*(-math.abs(deltaTime*(targetFissionRate-interiorFissionRate)*heat/50)*reactorMaxOutput+1))*(highVoltageGridPower-highVoltageGridLoad)*deltaTime,0,5)
+    end
     if type(inp[7]) == "number" then
         if reactorMaxOutput>inp[7]*0.99 then
+            MaxOutputAdjust=0
             reactorMaxOutput = inp[7] --设定反应堆最大输出
         end
     end
@@ -153,16 +161,14 @@ function upd(deltaTime)
     local signalFissionRate=0.0
     local signalTurbine = turbineFixed
 
-    if time>=5 and time<=60*5+4 then
+    if time>=0 and time<60*5-3 then
         UpdateAutoTemp(100.0,deltaTime*10,highVoltageGridPower/reactorMaxOutput,highVoltageGridLoad/reactorMaxOutput)
-        signalTurbine=CorrectTurbineOutput --todo:why?
         UpdateAutoTempAfter(heat,signalFissionRate,signalTurbine,deltaTime,highVoltageGridLoad/reactorMaxOutput)
     elseif(time>=6) then
         local staticFissionRate=getStaticFissionRate(interiorTurbine,50*load,heat)
         local DFissionRate=clamp(getStaticFissionRate(targetTurbine-interiorTurbine,50*Dload,heat),-(scrollbarSpeed-eps),(scrollbarSpeed-eps))
         if math.abs(load-lastLoad+(targetTurbine-interiorTurbine)*deltaTime/50)*reactorMaxOutput>2.5 and math.abs(load-2*lastLoad+lastlastLoad)<temperatureSpeed/50*deltaTime/1.0 then
             local prefix=sigmoid(3*((load-2*lastLoad+lastlastLoad)*2/(clamp(math.abs(load-lastLoad),1/reactorMaxOutput,1)*sign(load-lastLoad))+1))
-            --test = prefix
             staticFissionRate=clamp(staticFissionRate+(prefix*2.5*clamp(getStaticFissionRate((targetTurbine-interiorTurbine)*0.5/2.5,50*Dload,heat),-(scrollbarSpeed-eps),(scrollbarSpeed-eps)))*deltaTime*(1+1*deltaTime),0,100) --从收到负载到输出有2帧间隔
         end
         local fissionRateSign=sign(DFissionRate+interiorFissionRate-targetFissionRate)
@@ -202,6 +208,7 @@ function upd(deltaTime)
     if time<10 and reactorOffNewRound then
         out[4] = 1 --停堆信号
     end
-    --out[5] = math.ceil(test*1000)/1000
+    test=reactorMaxOutput+MaxOutputAdjust--测试用
+    out[5] = math.ceil(test*100000)/100000--测试用
     table.clear(inp)
 end
