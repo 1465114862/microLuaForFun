@@ -1,4 +1,4 @@
-local reactorMaxOutput = 5000  --反应堆最大功率，如有升级，填入只计算潜艇升级的值(不计算天赋)
+local reactorMaxOutput = 10000  --反应堆最大功率，如有升级，填入只计算潜艇升级的值(不计算天赋)
 local turbineFixed = 100.0  --温度堆模式下固定的涡轮输出，如果用不到反应堆满输出可降低此值以减少温度堆模式下燃料消耗
 local reactorOffNewRound = false --新巡回是否关反应堆
 local voltage=1.0 --电网电压
