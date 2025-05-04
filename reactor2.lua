@@ -152,10 +152,10 @@ function upd(deltaTime)
         reactorOff = false
     end
     if reactorOff then
-        interiorFissionRate = getStaticFissionRate(0,0.015,heat)
-        targetFissionRate = getStaticFissionRate(0,0.015,heat)
+        interiorFissionRate = getStaticFissionRate(0,0.02,heat)
+        targetFissionRate = getStaticFissionRate(0,0.05,heat)
         interiorTurbine = 0
-        targetTurbine = 0
+        targetTurbine = -scrollbarSpeed*deltaTime
     end
     local Dload=(load-lastLoad)/deltaTime
     local signalFissionRate=0.0
