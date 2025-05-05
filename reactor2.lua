@@ -111,7 +111,7 @@ function upd(deltaTime)
     if temperature/50>(lastInteriorTurbine-turbineTolerance)/100 and temperature>1 and lastInteriorTurbine>turbineTolerance and highVoltageGridPower-highVoltageGridLoad>3 then
         powerAdjusted=highVoltageGridPower*math.min(temperature*100/50,lastInteriorTurbine)/clamp(lastInteriorTurbine-turbineTolerance,0.5*lastInteriorTurbine,lastInteriorTurbine)
     end
-    if powerAdjusted>highVoltageGridLoad or temperature/50<(lastInteriorTurbine-10*turbineTolerance)/100 then
+    if powerAdjusted>highVoltageGridLoad or temperature/50<(lastInteriorTurbine-10*turbineTolerance)/100 and time>60 then
         local preEstimatedReactorMaxOutput=math.max(estimatedReactorMaxOutput,powerAdjusted*50/(temperature+0.01))
         MaxOutputAdjust=clamp(MaxOutputAdjust-(preEstimatedReactorMaxOutput-estimatedReactorMaxOutput),0,5)
         estimatedReactorMaxOutput=preEstimatedReactorMaxOutput
