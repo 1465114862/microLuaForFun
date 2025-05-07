@@ -20,6 +20,7 @@ local interiorTurbine = 0.0
 local targetTurbine = 0.0
 local reacotrMode = 0
 local reactorOff = false
+local starting = true
 
 local test=0 --测试用
 
@@ -163,6 +164,7 @@ function upd(deltaTime)
 
     if time>=0 and time<60*5-3 then
         UpdateAutoTemp(100.0,deltaTime*10,highVoltageGridPower/reactorMaxOutput,highVoltageGridLoad/reactorMaxOutput)
+        signalTurbine=targetTurbine --防开局超载
         UpdateAutoTempAfter(heat,signalFissionRate,signalTurbine,deltaTime,highVoltageGridLoad/reactorMaxOutput)
     elseif(time>=6) then
         local staticFissionRate=getStaticFissionRate(interiorTurbine,50*load,heat)
@@ -175,7 +177,7 @@ function upd(deltaTime)
         signalFissionRate = staticFissionRate+DFissionRate-magicPara*(scrollbarSpeed*fissionRateSign-DFissionRate)*math.log((targetFissionRate-interiorFissionRate-fissionRateSign*scrollbarSpeed)/(DFissionRate-fissionRateSign*scrollbarSpeed))
         signalFissionRate = clamp(targetFissionRate+0.5*(1+scrollbarSpeed/clamp(math.abs(interiorFissionRate-targetFissionRate),0.2,scrollbarSpeed))*(signalFissionRate-targetFissionRate),0,100)
 
-        if reacotrMode==1  then
+        if reacotrMode==1 or starting  then
             local staticTurbine=100*load
             local DTurbine=clamp(100*Dload,-(scrollbarSpeed-eps),(scrollbarSpeed-eps))
             if math.abs(load-lastLoad)*reactorMaxOutput>2.5 and math.abs(load-2*lastLoad+lastlastLoad)<temperatureSpeed/50*deltaTime/1.0 then --todo导数条件
@@ -201,6 +203,9 @@ function upd(deltaTime)
     if reactorOff then
         signalFissionRate = getStaticFissionRate(0,0.05,heat)
         signalTurbine = 0
+    end
+    if time>1200 or (time>300 and (reactorOff or -(50*load-temperature)/(50*load)<0.03)) then --防开局超载
+        starting=false
     end
     out[1] = signalFissionRate --裂变速率
     out[2] = signalTurbine --涡轮输出
